@@ -103,6 +103,32 @@ const normalizeUserResponse = (doc) => {
     };
 };
 
+const assertEmailAvailableAcrossRoles = async (
+    cleanEmail,
+    { excludeAdminId = null, excludeCoachId = null, excludePlayerId = null } = {}
+) => {
+    if (!cleanEmail) return;
+
+    const [admin, coach, player] = await Promise.all([
+        Admin.findOne({
+            email: cleanEmail,
+            ...(excludeAdminId ? { _id: { $ne: excludeAdminId } } : {}),
+        }).select('_id'),
+        Coach.findOne({
+            email: cleanEmail,
+            ...(excludeCoachId ? { _id: { $ne: excludeCoachId } } : {}),
+        }).select('_id'),
+        Player.findOne({
+            email: cleanEmail,
+            ...(excludePlayerId ? { _id: { $ne: excludePlayerId } } : {}),
+        }).select('_id'),
+    ]);
+
+    if (admin || coach || player) {
+        throw new Error('Email already exists in another account');
+    }
+};
+
 // @desc    Register new Coach
 // @route   POST /api/auth/coach/signup
 const registerCoach = asyncHandler(async (req, res) => {
@@ -511,11 +537,12 @@ const createPlayerByCoach = asyncHandler(async (req, res) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // Check if player exists
-    const playerExists = await Player.findOne({ email: cleanEmail });
-    if (playerExists) {
+    // Check if email exists in any user role to avoid profile crossover.
+    try {
+        await assertEmailAvailableAcrossRoles(cleanEmail);
+    } catch (error) {
         res.status(400);
-        throw new Error('Player already exists');
+        throw new Error('Email already exists');
     }
 
     // Hash password
@@ -590,7 +617,18 @@ const updateStaff = asyncHandler(async (req, res) => {
     const previousAssignedTeamIds = normalizeIdList(staff.assignedTeamIds);
 
     if (username) staff.username = username;
-    if (email) staff.email = email.toLowerCase().trim();
+    if (email) {
+        const cleanEmail = email.toLowerCase().trim();
+        if (cleanEmail !== staff.email) {
+            try {
+                await assertEmailAvailableAcrossRoles(cleanEmail, { excludeCoachId: staff._id });
+            } catch (error) {
+                res.status(400);
+                throw new Error('Email already exists');
+            }
+        }
+        staff.email = cleanEmail;
+    }
     if (role && ['coach', 'assistant_coach', 'custom'].includes(role)) staff.role = role;
     if (customRoleName !== undefined) staff.customRoleName = customRoleName;
     if (Array.isArray(assignedTeamIds)) {
@@ -859,7 +897,16 @@ const updatePlayerByAdmin = asyncHandler(async (req, res) => {
     if (position !== undefined) player.position = position;
     if (ageRange !== undefined) player.ageRange = ageRange;
     if (email !== undefined && email.trim()) {
-        player.email = email.toLowerCase().trim();
+        const cleanEmail = email.toLowerCase().trim();
+        if (cleanEmail !== player.email) {
+            try {
+                await assertEmailAvailableAcrossRoles(cleanEmail, { excludePlayerId: player._id });
+            } catch (error) {
+                res.status(400);
+                throw new Error('Email already exists');
+            }
+        }
+        player.email = cleanEmail;
     }
     if (password !== undefined && password.trim()) {
         const salt = await bcrypt.genSalt(10);

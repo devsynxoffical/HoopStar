@@ -28,7 +28,7 @@ class _StrategyScreenState extends State<StrategyScreen> {
       vm.startLiveSync();
       final profileVm = context.read<ProfileViewmodel>();
       if (profileVm.user == null) {
-        profileVm.loadProfile();
+        profileVm.loadProfile(forceRefresh: true);
       }
     });
   }
@@ -348,14 +348,16 @@ class _StrategyScreenState extends State<StrategyScreen> {
               return Consumer<StrategyViewmodel>(
                 builder: (context, vm, _) {
                   final strategies = _filtered(vm.strategies);
+                  final role = user?.role ?? '';
+                  final roleLabel = role.replaceAll('_', ' ').trim();
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
                           const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   'Strategy Videos',
@@ -388,6 +390,21 @@ class _StrategyScreenState extends State<StrategyScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      if (roleLabel.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white10,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            canCreate
+                                ? 'Logged in as $roleLabel: you can publish and watch strategy videos.'
+                                : 'Logged in as $roleLabel: you can watch strategy videos.',
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -403,6 +420,14 @@ class _StrategyScreenState extends State<StrategyScreen> {
                       Expanded(
                         child: vm.isLoading
                             ? const Center(child: CircularProgressIndicator())
+                            : vm.errorMessage != null && vm.strategies.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      vm.errorMessage!,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(color: Colors.white60),
+                                    ),
+                                  )
                             : strategies.isEmpty
                                 ? const Center(
                                     child: Text(

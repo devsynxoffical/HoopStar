@@ -32,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (isLoggedIn) {
       // Fetch profile to check profileCompleted status
-      await profileVm.loadProfile();
+      await profileVm.loadProfile(forceRefresh: true);
       final user = profileVm.user;
 
       if (user != null) {

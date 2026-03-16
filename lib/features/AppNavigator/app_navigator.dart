@@ -34,7 +34,7 @@ class _AppNavigatorState extends State<AppNavigator> {
     // Centralized profile load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final profileVm = context.read<ProfileViewmodel>();
-      profileVm.loadProfile().then((_) {
+      profileVm.loadProfile(forceRefresh: true).then((_) {
         final resolvedRole = profileVm.user?.role;
         if (!mounted || resolvedRole == null || resolvedRole.isEmpty) return;
         if (resolvedRole != _effectiveRole) {
