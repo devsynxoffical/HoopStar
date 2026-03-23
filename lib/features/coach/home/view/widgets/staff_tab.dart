@@ -19,6 +19,11 @@ class _StaffTabState extends State<StaffTab> {
   bool _isLoading = true;
   String? _error;
 
+  // BallChart Design Tokens
+  static const Color primaryColor = Color(0xFFFFD900);
+  static const Color bgColor = Color(0xFF111111);
+  static const Color cardColor = Color(0xFF1A1A1A);
+
   @override
   void initState() {
     super.initState();
@@ -45,27 +50,19 @@ class _StaffTabState extends State<StaffTab> {
 
   String _formatRole(String role) {
     switch (role) {
-      case 'head_coach':
-        return 'Head Coach';
-      case 'assistant_coach':
-        return 'Asst. Coach';
-      case 'coach':
-        return 'Coach';
-      default:
-        return role;
+      case 'head_coach': return 'Head Coach';
+      case 'assistant_coach': return 'Asst. Coach';
+      case 'coach': return 'Coach';
+      default: return role;
     }
   }
 
   Color _roleColor(String role) {
     switch (role) {
-      case 'head_coach':
-        return AppColors.yellow;
-      case 'assistant_coach':
-        return const Color(0xFF8B5CF6);
-      case 'coach':
-        return const Color(0xFF3B82F6);
-      default:
-        return Colors.grey;
+      case 'head_coach': return primaryColor;
+      case 'assistant_coach': return const Color(0xFF8B5CF6);
+      case 'coach': return const Color(0xFF3B82F6);
+      default: return Colors.grey;
     }
   }
 
@@ -75,24 +72,28 @@ class _StaffTabState extends State<StaffTab> {
     final role = user?.role ?? 'coach';
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.yellow));
+      return const Center(child: CircularProgressIndicator(color: primaryColor));
     }
 
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, color: Colors.white38, size: 48),
-              const SizedBox(height: 12),
-              Text('Error: $_error', style: const TextStyle(color: Colors.white60), textAlign: TextAlign.center),
+              const Icon(Icons.error_outline, color: Colors.white24, size: 64),
               const SizedBox(height: 16),
+              Text(_error!, style: const TextStyle(color: Colors.white60), textAlign: TextAlign.center),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _loadStaff,
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.yellow, foregroundColor: Colors.black),
-                child: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('RETRY', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
               ),
             ],
           ),
@@ -101,37 +102,54 @@ class _StaffTabState extends State<StaffTab> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Quick Action Buttons
+          // Header Section
+          const Text(
+            'STAFF DIRECTORY',
+            style: TextStyle(
+              color: primaryColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Manage your elite coaching and analytical team.',
+            style: TextStyle(color: Colors.white60, fontSize: 14),
+          ),
+          const SizedBox(height: 32),
+
+          // Actions
           if (role == 'head_coach') ...[
             Row(
               children: [
                 Expanded(
                   child: _buildActionButton(
                     icon: Icons.person_add_rounded,
-                    label: 'Add Staff',
-                    color: AppColors.green,
+                    label: 'ADD STAFF',
+                    color: const Color(0xFF8B5CF6),
                     onTap: () => _showCreateStaffDialog(context),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildActionButton(
-                    icon: Icons.sports_basketball,
-                    label: 'Add Player',
-                    color: AppColors.blue,
+                    icon: Icons.sports_basketball_rounded,
+                    label: 'ADD PLAYER',
+                    color: const Color(0xFF3B82F6),
                     onTap: () => _showCreatePlayerDialog(context),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
           ],
 
-          // You card
+          // "You" Card
           _buildStaffCard(
             name: user?.username ?? 'You',
             role: _formatRole(role),
@@ -139,37 +157,35 @@ class _StaffTabState extends State<StaffTab> {
             roleColor: _roleColor(role),
             isYou: true,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 32),
 
-          // Staff list header
+          // Staff List
           if (_staffList.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 12),
-              child: Row(
-                children: [
-                  const Text(
-                    'Your Staff',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'ACADEMY STAFF',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${_staffList.length}',
-                      style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
+                  child: Text(
+                    '${_staffList.length}',
+                    style: const TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+            const SizedBox(height: 16),
             ..._staffList.map((staff) {
               final staffRole = staff['role'] ?? 'staff';
               return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(bottom: 12),
                 child: _buildStaffCard(
                   name: staff['username'] ?? 'Unknown',
                   role: _formatRole(staffRole),
@@ -184,25 +200,24 @@ class _StaffTabState extends State<StaffTab> {
           if (_staffList.isEmpty && role == 'head_coach')
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(32),
-              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.symmetric(vertical: 48),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
+                color: cardColor,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.06), style: BorderStyle.solid),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
               ),
               child: Column(
                 children: [
-                  Icon(Icons.group_add_outlined, color: Colors.white.withValues(alpha: 0.15), size: 48),
-                  const SizedBox(height: 12),
-                  const Text('No staff members yet', style: TextStyle(color: Colors.white54, fontSize: 15, fontWeight: FontWeight.w500)),
+                  Icon(Icons.badge_outlined, color: Colors.white.withOpacity(0.1), size: 64),
+                  const SizedBox(height: 16),
+                  const Text('No staff members registered', style: TextStyle(color: Colors.white54, fontSize: 15)),
                   const SizedBox(height: 4),
-                  const Text('Tap "Add Staff" to create accounts', style: TextStyle(color: Colors.white30, fontSize: 13)),
+                  const Text('Invite coaches to start tracking', style: TextStyle(color: Colors.white24, fontSize: 13)),
                 ],
               ),
             ),
-
-          const SizedBox(height: 40),
+          
+          const SizedBox(height: 100), // Bottom nav space
         ],
       ),
     );
@@ -217,18 +232,17 @@ class _StaffTabState extends State<StaffTab> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
+          color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          border: Border.all(color: color.withOpacity(0.2)),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 8),
+            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5)),
           ],
         ),
       ),
@@ -243,31 +257,31 @@ class _StaffTabState extends State<StaffTab> {
     required bool isYou,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-        border: isYou
-            ? Border.all(color: roleColor.withValues(alpha: 0.5), width: 1)
-            : null,
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isYou ? roleColor.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+          width: isYou ? 1.5 : 1,
+        ),
       ),
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: roleColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+              color: roleColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(15),
             ),
-            child: Center(
-              child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: TextStyle(color: roleColor, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+            alignment: Alignment.center,
+            child: Text(
+              name.isNotEmpty ? name[0].toUpperCase() : '?',
+              style: TextStyle(color: roleColor, fontSize: 20, fontWeight: FontWeight.w900),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,40 +291,38 @@ class _StaffTabState extends State<StaffTab> {
                     Flexible(
                       child: Text(
                         name,
-                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                        style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (isYou) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: roleColor.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
+                          color: primaryColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text('YOU', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                        child: const Text('OWNER', style: TextStyle(color: primaryColor, fontSize: 9, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ],
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: roleColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(role, style: TextStyle(color: roleColor, fontSize: 10, fontWeight: FontWeight.w600)),
+                    Text(
+                      role.toUpperCase(),
+                      style: TextStyle(color: roleColor, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                     ),
                     if (email.isNotEmpty && !isYou) ...[
+                      const SizedBox(width: 8),
+                      const Text('•', style: TextStyle(color: Colors.white24)),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
                           email,
-                          style: const TextStyle(color: Colors.white30, fontSize: 11),
+                          style: const TextStyle(color: Colors.white38, fontSize: 12),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -320,6 +332,7 @@ class _StaffTabState extends State<StaffTab> {
               ],
             ),
           ),
+          const Icon(Icons.chevron_right_rounded, color: Colors.white24),
         ],
       ),
     );
@@ -330,9 +343,7 @@ class _StaffTabState extends State<StaffTab> {
       context: context,
       builder: (_) => CreateStaffDialog(
         initialRole: 'Coach',
-        onStaffCreated: (staff) {
-          _loadStaff();
-        },
+        onStaffCreated: (staff) => _loadStaff(),
       ),
     );
   }
@@ -341,9 +352,7 @@ class _StaffTabState extends State<StaffTab> {
     showDialog(
       context: context,
       builder: (_) => CreatePlayerDialog(
-        onPlayerCreated: (player) {
-          // Player was created via API
-        },
+        onPlayerCreated: (player) {},
       ),
     );
   }

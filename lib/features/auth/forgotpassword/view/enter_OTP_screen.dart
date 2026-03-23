@@ -1,66 +1,186 @@
 import 'package:flutter/material.dart';
-import 'package:courtiq/core/widgets/resetPassword/reset_header.dart';
 import 'package:courtiq/features/auth/forgotpassword/viewmodel/otp_viewmodel.dart';
-import '../../../../core/constants/colors.dart';
-import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/widgets/resetPassword/otp_input.dart';
 
 class EnterOtpScreen extends StatelessWidget {
   final String role;
-  const EnterOtpScreen({super.key,required this.role});
+  const EnterOtpScreen({super.key, required this.role});
+
+  // BallChart Design Colors
+  static const Color primaryColor = Color(0xFFFFD900);
+  static const Color bgColor = Color(0xFF181710);
+  static const Color fieldBgColor = Color(0x801E293B); 
+  static const Color fieldBorderColor = Color(0xFF334155);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ResetHeader(
-                bgColor: AppColors.yellow,
-                title: 'BallChart',
-                subtitle: 'Password Recovery',
+      backgroundColor: bgColor,
+      body: Stack(
+        children: [
+          // Background ambient light
+          Positioned(
+            bottom: -100,
+            left: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor.withOpacity(0.03),
+                boxShadow: [
+                  BoxShadow(color: primaryColor.withOpacity(0.04), blurRadius: 150, spreadRadius: 80),
+                ],
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Reset Password',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const SizedBox(height: 30),
-              const Text(
-                'Enter 6-digit code sent to your email',
-                style: TextStyle(color: Colors.white60),
-              ),
-              const SizedBox(height: 24),
-              const OtpInput(),
-              const SizedBox(height: 30),
-              CustomButton(
-                backgroundColor: AppColors.yellow,
-                text: 'Verify Code',
-                textColor: AppColors.black,
-                onPressed: () {
-                  OTPViewmodel.goToEnterNewPass(context,role);
-                },
-              ),
-              const SizedBox(height: 14),
-              CustomButton(
-
-                text: 'Back',
-                backgroundColor: Colors.white10,
-                textColor: Colors.white,
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
+            ),
           ),
-        ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // Logo Container
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.3),
+                          blurRadius: 20,
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.mark_email_read_rounded,
+                      color: bgColor,
+                      size: 38,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  const Text(
+                    'Verify Code',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'We\'ve sent a 6-digit verification code to your email address. Please enter it below to proceed.',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+
+                  // OTP Input Placeholder (Since OtpInput is a separate widget, we preserve the layout logic)
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: List.generate(6, (index) => _buildOtpSquare()),
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+
+                  // CTA Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: bgColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 8,
+                        shadowColor: primaryColor.withOpacity(0.5),
+                      ),
+                      onPressed: () {
+                        OTPViewmodel.goToEnterNewPass(context, role);
+                      },
+                      child: const Text(
+                        'VERIFY CODE',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Resend Link
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        // Resend logic
+                      },
+                      child: RichText(
+                        text: const TextSpan(
+                          text: 'Didn\'t receive the code? ',
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                          children: [
+                            TextSpan(
+                              text: 'Resend',
+                              style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  const Spacer(),
+                  // Branding Icons
+                  const Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sports_basketball_rounded, color: Colors.white12, size: 28),
+                        SizedBox(width: 32),
+                        Icon(Icons.monitoring_rounded, color: Colors.white12, size: 28),
+                        SizedBox(width: 32),
+                        Icon(Icons.emoji_events_rounded, color: Colors.white12, size: 28),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOtpSquare() {
+    return Container(
+      width: 48,
+      height: 56,
+      decoration: BoxDecoration(
+        color: fieldBgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: fieldBorderColor),
+      ),
+      alignment: Alignment.center,
+      child: const TextField(
+        textAlign: TextAlign.center,
+        keyboardType: TextInputType.number,
+        style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+        decoration: InputDecoration(border: InputBorder.none),
       ),
     );
   }

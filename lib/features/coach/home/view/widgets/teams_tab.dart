@@ -18,6 +18,10 @@ class _TeamsTabState extends State<TeamsTab> {
   final DashboardRepository _dashboardRepository = DashboardRepository();
   late Future<List<Map<String, dynamic>>> _teamsFuture;
 
+  // BallChart Design Tokens
+  static const Color primaryColor = Color(0xFFFFD900);
+  static const Color bgColor = Color(0xFF111111);
+
   @override
   void initState() {
     super.initState();
@@ -36,30 +40,73 @@ class _TeamsTabState extends State<TeamsTab> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
+          const Text(
+            'ACADEMY TEAMS',
+            style: TextStyle(
+              color: primaryColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Manage rosters and elite divisions for the academy.',
+            style: TextStyle(color: Colors.white60, fontSize: 14),
+          ),
+          const SizedBox(height: 32),
+
           FutureBuilder<List<Map<String, dynamic>>>(
             future: _teamsFuture,
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(48),
+                    child: CircularProgressIndicator(color: primaryColor),
+                  ),
                 );
               }
-              final teams = snapshot.data!;
+              
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Error loading teams',
+                    style: TextStyle(color: Colors.redAccent.withOpacity(0.7)),
+                  ),
+                );
+              }
+
+              final teams = snapshot.data ?? [];
+              
               if (teams.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text('No teams available yet.', style: TextStyle(color: Colors.white54)),
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(48),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.shield_outlined, color: Colors.white.withOpacity(0.1), size: 64),
+                      const SizedBox(height: 16),
+                      const Text('No teams active', style: TextStyle(color: Colors.white54)),
+                    ],
+                  ),
                 );
               }
+
               return Column(
                 children: teams
                     .map((team) => Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.only(bottom: 12),
                           child: GestureDetector(
                             onTap: () {
                               Navigator.push(
@@ -82,40 +129,61 @@ class _TeamsTabState extends State<TeamsTab> {
             },
           ),
           
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  barrierDismissible: true,
-                  builder: (_) => CreateTeamDialog(
-                    onTeamCreated: (name, age, color, logoPath) async {
-                      final provider = context.read<AcademyProvider>();
-                      await provider.addTeamToBackend(
-                        Team(
-                          id: provider.nextId('t'),
-                          name: name,
-                          players: const [],
-                          ageGroup: age,
-                          colorValue: color.toARGB32(),
-                          logoPath: logoPath,
-                        ),
-                      );
-                      if (mounted) {
-                        setState(() {
-                          _teamsFuture = _loadTeams();
-                        });
-                      }
-                    },
+          const SizedBox(height: 32),
+          
+          // Add Team Button
+          GestureDetector(
+            onTap: () {
+              showDialog(
+                context: context,
+                barrierDismissible: true,
+                builder: (_) => CreateTeamDialog(
+                  onTeamCreated: (name, age, color, logoPath) async {
+                    final provider = context.read<AcademyProvider>();
+                    await provider.addTeamToBackend(
+                      Team(
+                        id: provider.nextId('t'),
+                        name: name,
+                        players: const [],
+                        ageGroup: age,
+                        colorValue: color.toARGB32(),
+                        logoPath: logoPath,
+                      ),
+                    );
+                    if (mounted) {
+                      setState(() {
+                        _teamsFuture = _loadTeams();
+                      });
+                    }
+                  },
+                ),
+              );
+            },
+            child: Container(
+              width: double.infinity,
+              height: 54,
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5)),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_business_rounded, color: Colors.black, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'CREATE NEW TEAM',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1),
                   ),
-                );
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('+ Create New Team'),
+                ],
+              ),
             ),
           ),
+          const SizedBox(height: 100),
         ],
       ),
     );

@@ -3,7 +3,6 @@ import '../../../core/widgets/custom_dialog.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../routes/routes_names.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/models/user_model.dart';
 
 import 'package:provider/provider.dart';
 import '../../profile/viewmodel/profile_viewmodel.dart';
@@ -93,25 +92,30 @@ class AuthViewmodel extends ChangeNotifier {
       _setLoading(false);
 
       final bool isAcademySignup = role == 'admin';
-      showDialog(
-        context: context,
-        builder: (context) => CustomDialog(
-          title: isAcademySignup ? 'Request Submitted' : 'Success!',
-          message: isAcademySignup
-              ? 'Your academy signup request has been submitted. Admin will contact you shortly with details. Approval usually happens within 24 hours.'
-              : 'Account created successfully. Please log in.',
-          isSuccess: true,
-          onOk: () {
-             if (isAcademySignup) {
-               Navigator.pushNamedAndRemoveUntil(context, RouteNames.login, (route) => false, arguments: 'admin');
-             } else if (role == 'coach' || role == 'head_coach') {
-               Navigator.pushNamedAndRemoveUntil(context, RouteNames.profilecomplete_coach, (route) => false);
-             } else {
-               Navigator.pushNamedAndRemoveUntil(context, RouteNames.profilecomplete_player, (route) => false);
-             }
-          },
-        ),
-      );
+      if (isAcademySignup) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          RouteNames.registration_success,
+          (route) => false,
+          arguments: 'admin',
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => CustomDialog(
+            title: 'Success!',
+            message: 'Account created successfully. Please log in.',
+            isSuccess: true,
+            onOk: () {
+              if (role == 'coach' || role == 'head_coach') {
+                Navigator.pushNamedAndRemoveUntil(context, RouteNames.profilecomplete_coach, (route) => false);
+              } else {
+                Navigator.pushNamedAndRemoveUntil(context, RouteNames.profilecomplete_player, (route) => false);
+              }
+            },
+          ),
+        );
+      }
 
     } catch (e) {
       _setLoading(false);
@@ -137,10 +141,6 @@ class AuthViewmodel extends ChangeNotifier {
   }
 
   // Navigation helpers
-  static void goToRoleSelecting(BuildContext context) {
-    Navigator.pushNamed(context, RouteNames.roleselecting);
-  }
-
   static void goToLogin(BuildContext context) {
     Navigator.pushNamed(context, RouteNames.login);
   }

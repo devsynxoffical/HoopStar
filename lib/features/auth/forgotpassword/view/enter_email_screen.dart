@@ -1,88 +1,197 @@
 import 'package:flutter/material.dart';
-import 'package:courtiq/core/widgets/resetPassword/reset_header.dart';
 import 'package:courtiq/features/auth/forgotpassword/viewmodel/email_viewmodel.dart';
-import '../../../../core/constants/colors.dart';
-import '../../../../core/widgets/custom_button.dart';
-
 
 class EnterEmailScreen extends StatelessWidget {
   final String role;
-  const EnterEmailScreen({super.key,required this.role});
+  const EnterEmailScreen({super.key, required this.role});
+
+  // BallChart Design Colors
+  static const Color primaryColor = Color(0xFFFFD900);
+  static const Color bgColor = Color(0xFF181710);
+  static const Color fieldBgColor = Color(0x801E293B); 
+  static const Color fieldBorderColor = Color(0xFF334155); 
+  static const Color textColor = Color(0xFFF1F5F9); 
 
   @override
   Widget build(BuildContext context) {
+    final emailController = TextEditingController();
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ResetHeader(
-                bgColor: AppColors.yellow,
-                title: 'BallChart',
-                subtitle: 'Password Recovery',
+      backgroundColor: bgColor,
+      body: Stack(
+        children: [
+          // Background ambient light
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor.withOpacity(0.03),
+                boxShadow: [
+                  BoxShadow(color: primaryColor.withOpacity(0.04), blurRadius: 150, spreadRadius: 80),
+                ],
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Reset Password',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Enter your registered email',
-                style: TextStyle(color: Colors.white.withOpacity(0.7)),
-              ),
-              const SizedBox(height: 40),
-              _inputField('Email Address', 'your@email.com'),
-              const SizedBox(height: 24),
-              CustomButton(
-                text: 'Send Verification Code',
-                textColor: AppColors.black,
-                backgroundColor: AppColors.yellow,
-                onPressed: () {
-                  EmailViewmodel.goToEnterOTP(context,role);
-                },
-              ),
-              const SizedBox(height: 14),
-              CustomButton(
-                text: 'Back to Login',
-                backgroundColor: Colors.white10,
-                textColor: Colors.white,
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _inputField(String label, String hint) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white70)),
-        const SizedBox(height: 6),
-        TextField(
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: Colors.white38),
-            filled: true,
-            fillColor: const Color(0xFF1E293B),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
             ),
           ),
-        ),
-      ],
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // Logo Container
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.3),
+                          blurRadius: 20,
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.lock_reset_rounded,
+                      color: bgColor,
+                      size: 38,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  const Text(
+                    'Forgot Password',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No worries, it happens. Enter the email address associated with your BallChart account and we\'ll send you a link to reset your password.',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+
+                  // Email Field
+                  const Text(
+                    'EMAIL ADDRESS',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: fieldBgColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: fieldBorderColor),
+                    ),
+                    child: TextField(
+                      controller: emailController,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        hintText: 'coach@ballchart.com',
+                        hintStyle: TextStyle(color: Colors.grey),
+                        prefixIcon: Icon(Icons.mail_outline, color: Colors.grey),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // CTA Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: bgColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 8,
+                        shadowColor: primaryColor.withOpacity(0.5),
+                      ),
+                      onPressed: () {
+                        if (emailController.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter email address')),
+                          );
+                          return;
+                        }
+                        EmailViewmodel.goToEnterOTP(context, role);
+                      },
+                      child: const Text(
+                        'SEND RESET LINK',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Footer Link
+                  Center(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: RichText(
+                        text: const TextSpan(
+                          text: 'Remembered your password? ',
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                          children: [
+                            TextSpan(
+                              text: 'Log in here',
+                              style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  const Spacer(),
+                  // Branding Icons
+                  const Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.insert_chart_outlined_rounded, color: Colors.white12, size: 28),
+                        SizedBox(width: 32),
+                        Icon(Icons.query_stats_rounded, color: Colors.white12, size: 28),
+                        SizedBox(width: 32),
+                        Icon(Icons.bar_chart_rounded, color: Colors.white12, size: 28),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

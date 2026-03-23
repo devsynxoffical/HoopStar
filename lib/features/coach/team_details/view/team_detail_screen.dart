@@ -18,6 +18,11 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
   final DashboardRepository _dashboardRepository = DashboardRepository();
   final StaffService _staffService = StaffService();
 
+  // BallChart Design Tokens
+  static const Color primaryColor = Color(0xFFFFD900);
+  static const Color bgColor = Color(0xFF111111);
+  static const Color cardColor = Color(0xFF1A1A1A);
+
   String? _extractStaffName(
     dynamic staffRef,
     List<Map<String, dynamic>> staffList,
@@ -47,27 +52,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     final localRole = user?.role;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(widget.teamName, style: const TextStyle(color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      backgroundColor: bgColor,
       body: FutureBuilder<Map<String, dynamic>>(
         future: _dashboardRepository.getCoachDashboard(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: primaryColor));
           }
           final data = snapshot.data!;
           final profile = (data['profile'] as Map?)?.cast<String, dynamic>() ?? {};
@@ -98,67 +88,227 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           final coachName = _extractStaffName(team['coachStaffId'], staffList);
           final assistantCoachName = _extractStaffName(team['assistantCoachStaffId'], staffList);
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: HierarchyManagementWidget(
-                    onPlayerAdded: (_) {
-                      if (mounted) setState(() {});
-                    },
-                    role: role,
-                    teamId: teamId,
-                    canCreatePlayer: canCreatePlayers,
-                    coachName: coachName,
-                    assistantCoachName: assistantCoachName,
-                  ),
+          return CustomScrollView(
+            slivers: [
+              // Beautiful Header
+              SliverAppBar(
+                expandedHeight: 120,
+                floating: false,
+                pinned: true,
+                backgroundColor: bgColor,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
                 ),
-                const SizedBox(height: 30),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1E293B),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
+                flexibleSpace: FlexibleSpaceBar(
+                  centerTitle: false,
+                  titlePadding: const EdgeInsets.only(left: 56, bottom: 16),
+                  title: Text(
+                    widget.teamName.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  background: Stack(
                     children: [
-                      const Text(
-                        'Team Roster',
-                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      Positioned(
+                        right: -20,
+                        top: -20,
+                        child: Icon(Icons.shield_rounded, size: 140, color: Colors.white.withOpacity(0.03)),
                       ),
-                      const SizedBox(height: 16),
-                      if (players.isEmpty)
-                        const Text('No players found for this team.', style: TextStyle(color: Colors.white54)),
-                      ...players.map((p) => _buildRosterItem(
-                            p['_id']?.toString() ?? '',
-                            p['username']?.toString() ?? 'Player',
-                            p['position']?.toString() ?? '-',
-                            p['email']?.toString() ?? '',
-                            '#',
-                            canUpdatePlayers,
-                            canDeletePlayers,
-                            () => _deletePlayer(p['_id']?.toString() ?? ''),
-                            () => _editPlayerDialog(
-                              p['_id']?.toString() ?? '',
-                              p['username']?.toString() ?? '',
-                              p['email']?.toString() ?? '',
-                              p['position']?.toString() ?? '',
-                              p['ageRange']?.toString() ?? '',
-                            ),
-                          )),
                     ],
                   ),
                 ),
-              ],
-            ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Hierarchy Visualization
+                      const Text(
+                        'TEAM ARCHITECTURE',
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      HierarchyManagementWidget(
+                        onPlayerAdded: (_) {
+                          if (mounted) setState(() {});
+                        },
+                        role: role,
+                        teamId: teamId,
+                        canCreatePlayer: canCreatePlayers,
+                        coachName: coachName,
+                        assistantCoachName: assistantCoachName,
+                      ),
+                      
+                      const SizedBox(height: 48),
+
+                      // Roster Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'TEAM ROSTER',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${players.length}',
+                              style: const TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      if (players.isEmpty)
+                        _buildEmptyRoster()
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: players.length,
+                          itemBuilder: (context, index) {
+                            final p = players[index];
+                            return _buildRosterItem(
+                              p['_id']?.toString() ?? '',
+                              p['username']?.toString() ?? 'Player',
+                              p['position']?.toString() ?? '-',
+                              p['email']?.toString() ?? '',
+                              (index + 1).toString().padLeft(2, '0'),
+                              canUpdatePlayers,
+                              canDeletePlayers,
+                              () => _deletePlayer(p['_id']?.toString() ?? ''),
+                              () => _editPlayerDialog(
+                                p['_id']?.toString() ?? '',
+                                p['username']?.toString() ?? '',
+                                p['email']?.toString() ?? '',
+                                p['position']?.toString() ?? '',
+                                p['ageRange']?.toString() ?? '',
+                              ),
+                            );
+                          },
+                        ),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildEmptyRoster() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(48),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.person_add_disabled_rounded, color: Colors.white10, size: 64),
+          const SizedBox(height: 16),
+          const Text('Roster is currently empty', style: TextStyle(color: Colors.white38)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRosterItem(
+    String playerId,
+    String name,
+    String position,
+    String email,
+    String number,
+    bool canEdit,
+    bool canDelete,
+    VoidCallback onRemove,
+    VoidCallback onEdit,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              number,
+              style: const TextStyle(color: primaryColor, fontWeight: FontWeight.w900, fontSize: 16),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  position.toUpperCase(),
+                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                ),
+              ],
+            ),
+          ),
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_note_rounded, color: Colors.white24, size: 22),
+              onPressed: onEdit,
+            ),
+          if (canDelete)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent.withOpacity(0.3), size: 22),
+              onPressed: onRemove,
+            ),
+        ],
       ),
     );
   }
@@ -168,12 +318,17 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     final ok = await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
-            title: const Text('Delete Player', style: TextStyle(color: Colors.white)),
-            content: const Text('Are you sure you want to delete this player?', style: TextStyle(color: Colors.white70)),
+            backgroundColor: cardColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Remove Athlete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            content: const Text('Are you sure you want to remove this player from the roster?', style: TextStyle(color: Colors.white70)),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                child: const Text('REMOVE'),
+              ),
             ],
           ),
         ) ??
@@ -185,7 +340,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       if (mounted) {
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Player deleted'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Player removed from roster'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
@@ -214,54 +369,32 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     final saved = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Edit Player', style: TextStyle(color: Colors.white)),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Edit Athlete Profile', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: nameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'Name', labelStyle: TextStyle(color: Colors.white70)),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: emailController,
-                style: const TextStyle(color: Colors.white),
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(labelText: 'Login Email', labelStyle: TextStyle(color: Colors.white70)),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: passwordController,
-                style: const TextStyle(color: Colors.white),
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Reset/New Password (optional)',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  helperText: 'Leave empty to keep current password',
-                  helperStyle: TextStyle(color: Colors.white38),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: positionController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'Position', labelStyle: TextStyle(color: Colors.white70)),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: ageRangeController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'Age Range', labelStyle: TextStyle(color: Colors.white70)),
-              ),
+              _buildDialogField('Name', nameController),
+              const SizedBox(height: 16),
+              _buildDialogField('Login Email', emailController, type: TextInputType.emailAddress),
+              const SizedBox(height: 16),
+              _buildDialogField('Reset Password (Optional)', passwordController, obscure: true),
+              const SizedBox(height: 16),
+              _buildDialogField('Position', positionController),
+              const SizedBox(height: 16),
+              _buildDialogField('Age Range', ageRangeController),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL', style: TextStyle(color: Colors.white24))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.black),
+            child: const Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
@@ -280,7 +413,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       if (mounted) {
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Player updated'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Profile updated successfully'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
@@ -292,54 +425,25 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     }
   }
 
-  Widget _buildRosterItem(
-    String playerId,
-    String name,
-    String position,
-    String email,
-    String number,
-    bool canEdit,
-    bool canDelete,
-    VoidCallback onRemove,
-    VoidCallback onEdit,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Row(
-        children: [
-          CircleAvatar(backgroundColor: Colors.grey[800], child: Text(number)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                Text(position, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                if (email.isNotEmpty)
-                  Text(email, style: const TextStyle(color: Colors.white38, fontSize: 11)),
-              ],
-            ),
+  Widget _buildDialogField(String label, TextEditingController controller, {TextInputType type = TextInputType.text, bool obscure = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(), style: const TextStyle(color: primaryColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          obscureText: obscure,
+          keyboardType: type,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.03),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.05))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryColor)),
           ),
-          if (canEdit || canDelete)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (canEdit)
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
-                    onPressed: onEdit,
-                  ),
-                if (canDelete)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                    onPressed: onRemove,
-                  ),
-              ],
-            )
-          else
-            const SizedBox.shrink(),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
