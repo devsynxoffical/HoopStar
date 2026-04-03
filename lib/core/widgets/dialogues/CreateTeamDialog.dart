@@ -284,8 +284,8 @@ class _CreateTeamDialogState extends State<CreateTeamDialog> {
   Widget _buildStaffAssignment() {
     return Consumer<AcademyProvider>(
       builder: (context, provider, _) {
-        final coach = provider.getStaffById(_selectedCoachId);
-        final assistant = provider.getStaffById(_selectedAssistantId);
+        final coach = _selectedCoachId != null ? provider.getStaffById(_selectedCoachId) : null;
+        final assistant = _selectedAssistantId != null ? provider.getStaffById(_selectedAssistantId) : null;
 
         return Column(
           children: [

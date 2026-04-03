@@ -109,6 +109,9 @@ class AcademyProvider extends ChangeNotifier {
       
       _setupSocketListeners();
       _hasLoadedOverview = true;
+      
+      _isLoading = false;
+      notifyListeners();
     } catch (e) {
       _isLoading = false;
       _error = 'Failed to load admin overview: ${e.toString()}';
@@ -444,10 +447,11 @@ class AcademyProvider extends ChangeNotifier {
   }
 
   // Helper method to get staff by ID
-  Staff? getStaffById(String staffId) {
+  Staff? getStaffById(String? staffId) {
+    if (staffId == null || staffId.isEmpty) return null;
     try {
       return academy.staff.firstWhere((s) => s.id == staffId);
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
@@ -471,6 +475,10 @@ class AcademyProvider extends ChangeNotifier {
           'deletePlayer': updatedStaff.permissions.deletePlayer,
           'createTeam': updatedStaff.permissions.createTeam,
           'manageStaff': updatedStaff.permissions.manageStaff,
+          'createBattle': updatedStaff.permissions.createBattle,
+          'manageBattle': updatedStaff.permissions.manageBattle,
+          'createStrategy': updatedStaff.permissions.createStrategy,
+          'manageStrategy': updatedStaff.permissions.manageStrategy,
         },
       });
       
@@ -664,7 +672,6 @@ class AcademyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-
   Future<void> addStaffToBackend(Staff staff) async {
     try {
       _setLoading(true);
@@ -708,8 +715,6 @@ class AcademyProvider extends ChangeNotifier {
       _setLoading(false);
       _setError('Failed to create staff: ${e.toString()}');
     }
-  }  // Keep team lead labels in sync immediately after staff assignment changes.
-    await loadAdminOverview(force: true);
   }
 
   void updateStaff(Staff updatedStaff) {
@@ -719,42 +724,6 @@ class AcademyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateStaffInBackend(Staff updatedStaff) async {
-    final response = await _apiService.put('/auth/staff/${updatedStaff.id}', {
-      'username': updatedStaff.name,
-      'email': updatedStaff.email,
-      if (updatedStaff.password.isNotEmpty) 'password': updatedStaff.password,
-      'role': updatedStaff.role,
-      'customRoleName': updatedStaff.customRoleName,
-      'profilePic': updatedStaff.profilePic,
-      'assignedTeamIds': updatedStaff.assignedTeamIds,
-      'permissions': {
-        'createPlayer': updatedStaff.permissions.createPlayer,
-        'readPlayer': updatedStaff.permissions.readPlayer,
-        'updatePlayer': updatedStaff.permissions.updatePlayer,
-        'deletePlayer': updatedStaff.permissions.deletePlayer,
-        'createTeam': updatedStaff.permissions.createTeam,
-        'manageStaff': updatedStaff.permissions.manageStaff,
-      },
-    });
-    updateStaff(
-      Staff(
-        id: (response['_id'] ?? updatedStaff.id).toString(),
-        name: (response['username'] ?? updatedStaff.name).toString(),
-        email: (response['email'] ?? updatedStaff.email).toString(),
-        password: updatedStaff.password,
-        role: (response['role'] ?? updatedStaff.role).toString(),
-        customRoleName: response['customRoleName']?.toString() ?? updatedStaff.customRoleName,
-        assignedTeamIds: (response['assignedTeamIds'] as List<dynamic>? ?? updatedStaff.assignedTeamIds)
-            .map((e) => e.toString())
-            .toList(),
-        permissions: updatedStaff.permissions,
-      ),
-    );
-    // Backend may re-map coach/assistant team leads based on assigned teams.
-    await loadAdminOverview(force: true);
-  }
-
   void deleteStaff(String staffId) {
     academy.staff.removeWhere((s) => s.id == staffId);
     for (final team in academy.teams) {
@@ -762,23 +731,6 @@ class AcademyProvider extends ChangeNotifier {
       if (team.assistantCoachStaffId == staffId) team.assistantCoachStaffId = null;
     }
     notifyListeners();
-  }
-
-  Future<void> deleteStaffInBackend(String staffId) async {
-    try {
-      _setLoading(true);
-      _clearError();
-      
-      await _apiService.delete('/auth/staff/$staffId');
-      
-      deleteStaff(staffId);
-      
-      _setLoading(false);
-      _showSuccessMessage('Staff deleted successfully!');
-    } catch (e) {
-      _setLoading(false);
-      _setError('Failed to delete staff: ${e.toString()}');
-    }
   }
 
   void updateAcademyProfile({
@@ -792,34 +744,8 @@ class AcademyProvider extends ChangeNotifier {
     academy.logoUrl = logoUrl;
     adminName = ownerName;
     adminEmail = ownerEmail;
-    if (newPassword != null && newPassword.isNotEmpty) {
-      adminPassword = newPassword;
-    }
+    if (newPassword != null && newPassword.isNotEmpty) adminPassword = newPassword;
     notifyListeners();
-  }
-
-  Future<void> updateAcademyProfileInBackend({
-    required String academyName,
-    String? logoUrl,
-    required String ownerName,
-    required String ownerEmail,
-    String? newPassword,
-  }) async {
-    final response = await _apiService.put('/auth/admin/profile', {
-      'academyName': academyName,
-      'logoUrl': logoUrl,
-      'ownerName': ownerName,
-      'ownerEmail': ownerEmail,
-      if (newPassword != null && newPassword.isNotEmpty) 'newPassword': newPassword,
-    });
-
-    updateAcademyProfile(
-      academyName: (response['academyName'] ?? academyName).toString(),
-      logoUrl: response['logoUrl']?.toString(),
-      ownerName: (response['username'] ?? ownerName).toString(),
-      ownerEmail: (response['email'] ?? ownerEmail).toString(),
-      newPassword: newPassword,
-    );
   }
 
   void assignTeamLeads({
@@ -831,34 +757,5 @@ class AcademyProvider extends ChangeNotifier {
     team.coachStaffId = coachStaffId;
     team.assistantCoachStaffId = assistantCoachStaffId;
     notifyListeners();
-  }
-
-  Future<void> assignTeamLeadsInBackend({
-    required String teamId,
-    String? coachStaffId,
-    String? assistantCoachStaffId,
-  }) async {
-    await _apiService.put('/auth/team/$teamId/leads', {
-      'coachStaffId': coachStaffId,
-      'assistantCoachStaffId': assistantCoachStaffId,
-    });
-    assignTeamLeads(
-      teamId: teamId,
-      coachStaffId: coachStaffId,
-      assistantCoachStaffId: assistantCoachStaffId,
-    );
-  }
-
-  Staff? getStaffById(String? staffId) {
-    if (staffId == null) return null;
-    try {
-      return academy.staff.firstWhere((s) => s.id == staffId);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  String nextId(String prefix) {
-    return '$prefix${DateTime.now().microsecondsSinceEpoch}';
   }
 }

@@ -63,8 +63,8 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           }
 
           final teamColor = Color(team.colorValue);
-          final coach = provider.getStaffById(team.coachStaffId);
-          final assistant = provider.getStaffById(team.assistantCoachStaffId);
+          final coach = team.coachStaffId != null ? provider.getStaffById(team.coachStaffId) : null;
+          final assistant = team.assistantCoachStaffId != null ? provider.getStaffById(team.assistantCoachStaffId) : null;
 
           return RefreshIndicator(
             onRefresh: () => provider.loadAdminOverview(force: true),
