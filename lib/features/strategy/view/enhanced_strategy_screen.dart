@@ -1,0 +1,1152 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:video_player/video_player.dart';
+
+import '../../../core/constants/colors.dart';
+import '../../../core/models/strategy_model.dart';
+import '../../profile/viewmodel/profile_viewmodel.dart';
+import '../viewmodel/strategy_viewmodel.dart';
+import '../../../core/widgets/permission_wrapper.dart';
+
+class EnhancedStrategyScreen extends StatefulWidget {
+  const EnhancedStrategyScreen({super.key});
+
+  @override
+  State<EnhancedStrategyScreen> createState() => _EnhancedStrategyScreenState();
+}
+
+class _EnhancedStrategyScreenState extends State<EnhancedStrategyScreen> {
+  String _currentView = 'grid'; // grid, list, detail
+  String _selectedCategory = 'all';
+  String _selectedSort = 'recent';
+  final TextEditingController _searchController = TextEditingController();
+  StrategyViewmodel? _strategyViewmodel;
+
+  static const Color primaryColor = Color(0xFFFFD900);
+  static const Color bgColor = Color(0xFF131313);
+  static const Color surfaceHigh = Color(0xFF201F1F);
+  static const Color surfaceContainer = Color(0xFF1C1B1B);
+  static const Color outlineColor = Color(0xFF9D8F79);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDataWithRetry();
+    });
+  }
+
+  Future<void> _loadDataWithRetry({int retryCount = 3}) async {
+    for (int i = 0; i < retryCount; i++) {
+      try {
+        final vm = context.read<StrategyViewmodel>();
+        _strategyViewmodel = vm;
+        
+        // Load all data in parallel
+        await Future.wait([
+          vm.loadStrategies(),
+          vm.loadCategoriesAndTags(),
+          vm.loadPopularStrategies(),
+          vm.loadRecentStrategies(),
+        ]);
+        
+        vm.startLiveSync();
+        
+        final profileVm = context.read<ProfileViewmodel>();
+        if (profileVm.user == null) {
+          await profileVm.loadProfile(forceRefresh: true);
+        }
+        break;
+      } catch (e) {
+        if (i == retryCount - 1) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to load strategies: ${e.toString().replaceAll('Exception: ', '')}'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+                action: SnackBarAction(
+                  label: 'Retry',
+                  textColor: Colors.white,
+                  onPressed: () => _loadDataWithRetry(),
+                ),
+              ),
+            );
+          }
+        } else {
+          await Future.delayed(Duration(milliseconds: 1000 * (i + 1)));
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _strategyViewmodel?.stopLiveSync();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildSearchAndFilters(),
+            _buildViewToggle(),
+            Expanded(child: _buildContent()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Consumer<ProfileViewmodel>(
+      builder: (context, profileVm, _) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('PLAYBOOK INTELLIGENCE', style: TextStyle(color: outlineColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                  SizedBox(height: 4),
+                  Text('TACTICAL STRATEGY', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, fontFamily: 'Space Grotesk')),
+                ],
+              ),
+              PermissionWrapper(
+                permission: 'createStrategy',
+                child: GestureDetector(
+                  onTap: () => _showCreateStrategyDialog(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: const BoxDecoration(color: primaryColor, shape: BoxShape.circle),
+                    child: const Icon(Icons.add, color: Colors.black, size: 24),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchAndFilters() {
+    return Consumer<StrategyViewmodel>(
+      builder: (context, vm, _) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            children: [
+              // Search bar
+              Container(
+                decoration: BoxDecoration(
+                  color: surfaceHigh,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: outlineColor.withOpacity(0.2)),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => vm.setSearchQuery(value),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search strategies...',
+                    hintStyle: TextStyle(color: outlineColor.withOpacity(0.5)),
+                    prefixIcon: Icon(Icons.search, color: outlineColor.withOpacity(0.7)),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, color: Colors.white70),
+                            onPressed: () {
+                              _searchController.clear();
+                              vm.setSearchQuery('');
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Category and sort filters
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildFilterDropdown(
+                      'Category',
+                      ['all', ...vm.categories],
+                      _selectedCategory,
+                      (value) {
+                        _selectedCategory = value;
+                        if (value == 'all') {
+                          vm.clearFilters();
+                        } else {
+                          vm.setCategory(value);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildFilterDropdown(
+                      'Sort by',
+                      [
+                        {'value': 'recent', 'label': 'Recent'},
+                        {'value': 'popular', 'label': 'Popular'},
+                        {'value': 'views', 'label': 'Most Viewed'},
+                        {'value': 'likes', 'label': 'Most Liked'},
+                      ],
+                      _selectedSort,
+                      (value) {
+                        _selectedSort = value;
+                        vm.setSortOrder(value);
+                      },
+                      isMap: true,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterDropdown(
+    String label,
+    dynamic items,
+    String selectedValue,
+    Function(String) onChanged, {
+    bool isMap = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceHigh,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: outlineColor.withOpacity(0.2)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: selectedValue,
+          isExpanded: true,
+          icon: Icon(Icons.keyboard_arrow_down, color: outlineColor.withOpacity(0.7)),
+          items: items.map<DropdownMenuItem<String>>((item) {
+            final value = isMap ? item['value'] : item;
+            final displayText = isMap ? item['label'] : item;
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(displayText, style: const TextStyle(color: Colors.white)),
+            );
+          }).toList(),
+          onChanged: (String? value) {
+  if (value != null) onChanged(value);
+},
+          dropdownColor: const Color(0xFF1C1B1B),
+          style: const TextStyle(color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewToggle() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          const Text('View:', style: TextStyle(color: outlineColor, fontSize: 12)),
+          const SizedBox(width: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: surfaceHigh,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                _buildViewToggleItem('Grid', 'grid', Icons.grid_view),
+                _buildViewToggleItem('List', 'list', Icons.list),
+                _buildViewToggleItem('Analytics', 'analytics', Icons.analytics),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewToggleItem(String label, String value, IconData icon) {
+    final isSelected = _currentView == value;
+    return GestureDetector(
+      onTap: () => setState(() => _currentView = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? primaryColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: isSelected ? Colors.black : outlineColor),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(color: isSelected ? Colors.black : outlineColor, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_currentView == 'analytics') {
+      return _buildAnalyticsView();
+    }
+    
+    return Consumer<StrategyViewmodel>(
+      builder: (context, vm, _) {
+        if (vm.isLoading && vm.strategies.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: primaryColor),
+                SizedBox(height: 16),
+                Text('Loading Strategies...', style: TextStyle(color: Colors.white70)),
+              ],
+            ),
+          );
+        }
+
+        if (vm.errorMessage != null && vm.strategies.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 64),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error Loading Strategies',
+                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    vm.errorMessage!,
+                    style: const TextStyle(color: Colors.white70),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => _loadDataWithRetry(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('RETRY'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (vm.strategies.isEmpty) {
+          return _buildEmptyState();
+        }
+
+        if (_currentView == 'grid') {
+          return _buildGridView(vm.strategies);
+        } else {
+          return _buildListView(vm.strategies);
+        }
+      },
+    );
+  }
+
+  Widget _buildGridView(List<StrategyModel> strategies) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 0.8,
+        ),
+        itemCount: strategies.length,
+        itemBuilder: (context, index) => _strategyCard(strategies[index]),
+      ),
+    );
+  }
+
+  Widget _buildListView(List<StrategyModel> strategies) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: ListView.builder(
+        itemCount: strategies.length,
+        itemBuilder: (context, index) => _strategyListItem(strategies[index]),
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsView() {
+    return Consumer<StrategyViewmodel>(
+      builder: (context, vm, _) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('STRATEGY ANALYTICS', style: TextStyle(color: primaryColor, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              
+              // Overview cards
+              Row(
+                children: [
+                  Expanded(child: _analyticsCard('Total Strategies', '${vm.strategies.length}', Icons.library_books, Colors.blue)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _analyticsCard('Categories', '${vm.categories.length}', Icons.category, Colors.green)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _analyticsCard('Your Strategies', '${vm.myStrategies.length}', Icons.person, Colors.orange)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _analyticsCard('Popular', '${vm.popularStrategies.length}', Icons.trending_up, Colors.red)),
+                ],
+              ),
+              
+              const SizedBox(height: 32),
+              const Text('RECENT ACTIVITY', style: TextStyle(color: primaryColor, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              
+              // Recent strategies list
+              ...vm.recentStrategies.take(5).map((strategy) => _analyticsListItem(strategy)).toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _analyticsCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: surfaceHigh, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 12),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text(title, style: const TextStyle(color: outlineColor, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Widget _analyticsListItem(StrategyModel strategy) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: surfaceHigh, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: primaryColor.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.play_arrow, color: primaryColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(strategy.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(strategy.category, style: const TextStyle(color: outlineColor, fontSize: 12)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('${strategy.viewCount} views', style: const TextStyle(color: outlineColor, fontSize: 10)),
+              Text('${strategy.likeCount} likes', style: const TextStyle(color: primaryColor, fontSize: 10)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _strategyCard(StrategyModel strategy) {
+    return GestureDetector(
+      onTap: () => _showStrategyDetails(strategy),
+      child: Container(
+        decoration: BoxDecoration(
+          color: surfaceHigh,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: outlineColor.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Video thumbnail
+            Expanded(
+              flex: 3,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  color: surfaceContainer,
+                  image: strategy.thumbnailUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(strategy.thumbnailUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: strategy.thumbnailUrl == null
+                    ? const Center(
+                        child: Icon(Icons.play_circle_outline, color: outlineColor, size: 48),
+                      )
+                    : Stack(
+                        children: [
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                                color: Colors.black.withOpacity(0.3),
+                              ),
+                            ),
+                          ),
+                          const Center(
+                            child: Icon(Icons.play_circle_filled, color: primaryColor, size: 48),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            
+            // Content
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strategy.title,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      strategy.category,
+                      style: const TextStyle(color: primaryColor, fontSize: 10),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Icon(Icons.visibility, color: outlineColor, size: 12),
+                        const SizedBox(width: 4),
+                        Text('${strategy.viewCount}', style: const TextStyle(color: outlineColor, fontSize: 10)),
+                        const SizedBox(width: 12),
+                        Icon(Icons.favorite, color: Colors.red, size: 12),
+                        const SizedBox(width: 4),
+                        Text('${strategy.likeCount}', style: const TextStyle(color: outlineColor, fontSize: 10)),
+                        const Spacer(),
+                        _buildLikeButton(strategy),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _strategyListItem(StrategyModel strategy) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: surfaceHigh, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        children: [
+          // Thumbnail
+          Container(
+            width: 80,
+            height: 60,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: surfaceContainer,
+              image: strategy.thumbnailUrl != null
+                  ? DecorationImage(
+                      image: NetworkImage(strategy.thumbnailUrl!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: strategy.thumbnailUrl == null
+                ? const Center(child: Icon(Icons.play_arrow, color: outlineColor))
+                : null,
+          ),
+          const SizedBox(width: 16),
+          
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  strategy.title,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${strategy.category} • ${strategy.createdByName}',
+                  style: const TextStyle(color: outlineColor, fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.visibility, color: outlineColor, size: 12),
+                    const SizedBox(width: 4),
+                    Text('${strategy.viewCount}', style: const TextStyle(color: outlineColor, fontSize: 10)),
+                    const SizedBox(width: 12),
+                    Icon(Icons.favorite, color: Colors.red, size: 12),
+                    const SizedBox(width: 4),
+                    Text('${strategy.likeCount}', style: const TextStyle(color: outlineColor, fontSize: 10)),
+                    const Spacer(),
+                    Text(
+                      _formatDate(strategy.createdAt),
+                      style: const TextStyle(color: outlineColor, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // Actions
+          Column(
+            children: [
+              _buildLikeButton(strategy),
+              const SizedBox(height: 8),
+              IconButton(
+                icon: const Icon(Icons.more_vert, color: outlineColor, size: 16),
+                onPressed: () => _showStrategyOptions(strategy),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLikeButton(StrategyModel strategy) {
+    final isLiked = strategy.likedBy.isNotEmpty;
+    return GestureDetector(
+      onTap: () {
+        if (isLiked) {
+          context.read<StrategyViewmodel>().unlikeStrategy(strategy.id);
+        } else {
+          context.read<StrategyViewmodel>().likeStrategy(strategy.id);
+        }
+      },
+      child: Icon(
+        isLiked ? Icons.favorite : Icons.favorite_border,
+        color: isLiked ? Colors.red : outlineColor,
+        size: 16,
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.video_library_outlined, color: outlineColor, size: 64),
+            const SizedBox(height: 16),
+            const Text(
+              'No Strategies Yet',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Start by creating your first tactical strategy',
+              style: TextStyle(color: outlineColor),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            PermissionWrapper(
+              permission: 'createStrategy',
+              child: ElevatedButton(
+                onPressed: () => _showCreateStrategyDialog(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('CREATE STRATEGY'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showStrategyDetails(StrategyModel strategy) {
+    // Increment view count
+    context.read<StrategyViewmodel>().incrementViewCount(strategy.id);
+    
+    showDialog(
+      context: context,
+      builder: (_) => StrategyDetailDialog(strategy: strategy),
+    );
+  }
+
+  void _showStrategyOptions(StrategyModel strategy) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: surfaceContainer,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => StrategyOptionsSheet(strategy: strategy),
+    );
+  }
+
+  void _showCreateStrategyDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: bgColor,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetCtx) => CreateStrategyDialog(),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
+  }
+}
+
+// Supporting widgets
+class StrategyDetailDialog extends StatefulWidget {
+  final StrategyModel strategy;
+  
+  const StrategyDetailDialog({super.key, required this.strategy});
+
+  @override
+  State<StrategyDetailDialog> createState() => _StrategyDetailDialogState();
+}
+
+class _StrategyDetailDialogState extends State<StrategyDetailDialog> {
+  VideoPlayerController? _controller;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _initVideo();
+  }
+
+  Future<void> _initVideo() async {
+    try {
+      if (widget.strategy.videoUrl.isEmpty) {
+        throw Exception('Video URL is empty');
+      }
+      
+      final uri = Uri.parse(widget.strategy.videoUrl);
+      if (!uri.hasScheme || (!uri.scheme.startsWith('http'))) {
+        throw Exception('Invalid video URL format');
+      }
+      
+      _controller = VideoPlayerController.networkUrl(uri);
+      await _controller!.initialize();
+      await _controller!.setLooping(true);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load video: ${e.toString().replaceAll('Exception: ', '')}';
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF020617),
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.strategy.title,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                        Text(
+                          '${widget.strategy.category} • ${widget.strategy.createdByName}',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Video player
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(color: const Color(0xFFFFD900)),
+              )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              )
+            else if (_controller != null)
+              AspectRatio(
+                aspectRatio: _controller!.value.aspectRatio == 0 ? 16 / 9 : _controller!.value.aspectRatio,
+                child: VideoPlayer(_controller!),
+              ),
+            
+            // Actions
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      if (_controller != null) {
+                        if (_controller!.value.isPlaying) {
+                          _controller!.pause();
+                        } else {
+                          _controller!.play();
+                        }
+                        setState(() {});
+                      }
+                    },
+                    icon: Icon(
+                      _controller?.value.isPlaying == true ? Icons.pause : Icons.play_arrow,
+                      color: const Color(0xFFFFD900),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () {
+                      // Like functionality
+                    },
+                    icon: const Icon(Icons.favorite_border, color: Colors.white70),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      // Share functionality
+                    },
+                    icon: const Icon(Icons.share, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class CreateStrategyDialog extends StatefulWidget {
+  const CreateStrategyDialog({super.key});
+
+  @override
+  State<CreateStrategyDialog> createState() => _CreateStrategyDialogState();
+}
+
+class _CreateStrategyDialogState extends State<CreateStrategyDialog> {
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _videoUrlController = TextEditingController();
+  final _tagsController = TextEditingController();
+  
+  String _selectedCategory = 'general';
+  bool _isPublic = true;
+  bool _submitting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('CREATE STRATEGY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+            const SizedBox(height: 20),
+            
+            _buildTextField(_titleController, 'Title'),
+            const SizedBox(height: 12),
+            _buildTextField(_descriptionController, 'Description', maxLines: 3),
+            const SizedBox(height: 12),
+            _buildTextField(_videoUrlController, 'Video URL'),
+            const SizedBox(height: 12),
+            _buildTextField(_tagsController, 'Tags (comma separated)'),
+            const SizedBox(height: 12),
+            
+            _buildCategoryDropdown(),
+            const SizedBox(height: 16),
+            
+            Row(
+              children: [
+                Checkbox(
+                  value: _isPublic,
+                  onChanged: (value) => setState(() => _isPublic = value ?? false),
+                  activeColor: const Color(0xFFFFD900),
+                ),
+                const Text('Make public', style: TextStyle(color: Colors.white)),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _submitting ? null : _submitStrategy,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFD900),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.all(16),
+                ),
+                child: Text(_submitting ? 'CREATING...' : 'CREATE STRATEGY'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, {int maxLines = 1}) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF9D8F79)),
+        filled: true,
+        fillColor: const Color(0xFF201F1F),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
+    );
+  }
+
+  Widget _buildCategoryDropdown() {
+    return Consumer<StrategyViewmodel>(
+      builder: (context, vm, _) {
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF201F1F),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedCategory,
+              isExpanded: true,
+              items: ['general', ...vm.categories].map((category) {
+                return DropdownMenuItem<String>(
+                  value: category,
+                  child: Text(category, style: const TextStyle(color: Colors.white)),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => _selectedCategory = value!),
+              dropdownColor: const Color(0xFF1C1B1B),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _submitStrategy() async {
+    if (_titleController.text.isEmpty || _videoUrlController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in required fields'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    
+    try {
+      final tags = _tagsController.text
+          .split(',')
+          .map((tag) => tag.trim())
+          .where((tag) => tag.isNotEmpty)
+          .toList();
+      
+      await context.read<StrategyViewmodel>().createStrategy(
+        title: _titleController.text,
+        category: _selectedCategory,
+        sourceType: 'video',
+        sourceText: _descriptionController.text,
+        videoUrl: _videoUrlController.text,
+        tags: tags,
+        isPublic: _isPublic,
+      );
+      
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to create strategy: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _submitting = false);
+    }
+  }
+}
+
+class StrategyOptionsSheet extends StatelessWidget {
+  final StrategyModel strategy;
+  
+  const StrategyOptionsSheet({super.key, required this.strategy});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(color: const Color(0xFF9D8F79), borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 20),
+          
+          Text(
+            strategy.title,
+            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          ListTile(
+            leading: const Icon(Icons.edit, color: Color(0xFFFFD900)),
+            title: const Text('Edit Strategy', style: TextStyle(color: Colors.white)),
+            onTap: () {
+              Navigator.pop(context);
+              // Edit functionality
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.share, color: Color(0xFFFFD900)),
+            title: const Text('Share Strategy', style: TextStyle(color: Colors.white)),
+            onTap: () {
+              Navigator.pop(context);
+              // Share functionality
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete, color: Colors.red),
+            title: const Text('Delete Strategy', style: TextStyle(color: Colors.white)),
+            onTap: () {
+              Navigator.pop(context);
+              _showDeleteConfirm(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirm(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF201F1F),
+        title: const Text('Delete Strategy', style: TextStyle(color: Colors.white)),
+        content: Text('Are you sure you want to delete "${strategy.title}"?', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<StrategyViewmodel>().deleteStrategy(strategy.id);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+}
