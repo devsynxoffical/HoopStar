@@ -74,12 +74,22 @@ class AcademyProvider extends ChangeNotifier {
     if (_isLoading) return;
     if (_hasLoadedOverview && !force) return;
 
+    // Check if user is authenticated
+    final token = await _apiService.getToken();
+    if (token == null) {
+      _error = 'Not authenticated. Please log in again.';
+      notifyListeners();
+      return;
+    }
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
+      print('Loading admin overview with token: ${token.substring(0, 10)}...');
       final response = await _apiService.get('/auth/admin/overview');
+      print('Admin overview response received: ${response.runtimeType}');
       
       // Clear existing data and load from backend
       academy.teams.clear();
@@ -90,6 +100,8 @@ class AcademyProvider extends ChangeNotifier {
       final staffRaw = response['staff'] as List? ?? [];
       final teamsRaw = response['teams'] as List? ?? [];
       final battlesRaw = response['battles'] as List? ?? [];
+
+      print('Processing ${staffRaw.length} staff, ${teamsRaw.length} teams, ${battlesRaw.length} battles');
 
       final mappedStaff = staffRaw.map((e) => _mapStaff(e)).toList();
       final mappedTeams = teamsRaw.map((e) => _mapTeam(e)).toList();
@@ -112,9 +124,26 @@ class AcademyProvider extends ChangeNotifier {
       
       _isLoading = false;
       notifyListeners();
+      print('Admin overview loaded successfully');
     } catch (e) {
       _isLoading = false;
-      _error = 'Failed to load admin overview: ${e.toString()}';
+      String errorMessage = e.toString();
+      print('Error loading admin overview: $errorMessage');
+      
+      // Handle specific error cases
+      if (errorMessage.contains('401') || errorMessage.contains('Unauthorized')) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      } else if (errorMessage.contains('403') || errorMessage.contains('Forbidden')) {
+        errorMessage = 'Access denied. You do not have permission to view this data.';
+      } else if (errorMessage.contains('Cannot read properties of undefined')) {
+        errorMessage = 'Connection error. Please check your internet connection.';
+      } else if (errorMessage.contains('Network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (errorMessage.contains('timeout')) {
+        errorMessage = 'Request timeout. Please try again.';
+      }
+      
+      _error = 'Failed to load admin overview: $errorMessage';
       notifyListeners();
     }
   }
@@ -160,7 +189,7 @@ class AcademyProvider extends ChangeNotifier {
   void _setupSocketListeners() {
     _apiService.connectSocket();
     final socket = _apiService.socket;
-    if (socket == null) return;
+    if (socket == null || !socket.connected) return;
 
     // Clean up existing listeners first to prevent memory leaks
     _cleanupSocketListeners();
@@ -459,7 +488,6 @@ class AcademyProvider extends ChangeNotifier {
   // Helper method to update staff in backend
   Future<void> updateStaffInBackend(Staff updatedStaff) async {
     try {
-      _setLoading(true);
       _clearError();
       
       final response = await _apiService.put('/auth/staff/${updatedStaff.id}', {
@@ -482,13 +510,34 @@ class AcademyProvider extends ChangeNotifier {
         },
       });
       
+      // Update local state immediately
       updateStaff(updatedStaff);
-      
-      _setLoading(false);
       _showSuccessMessage('Staff updated successfully!');
+      
+      // Refresh data from server to ensure consistency
+      await Future.delayed(const Duration(milliseconds: 500));
+      await loadAdminOverview(force: true);
+      
     } catch (e) {
-      _setLoading(false);
-      _setError('Failed to update staff: ${e.toString()}');
+      String errorMessage = e.toString();
+      print('Error updating staff: $errorMessage');
+      
+      // Handle specific error cases
+      if (errorMessage.contains('401') || errorMessage.contains('Unauthorized')) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      } else if (errorMessage.contains('403') || errorMessage.contains('Forbidden')) {
+        errorMessage = 'Access denied. You do not have permission to update this staff.';
+      } else if (errorMessage.contains('Cannot read properties of undefined')) {
+        errorMessage = 'Connection error. The update may have succeeded. Please refresh.';
+      } else if (errorMessage.contains('Network')) {
+        errorMessage = 'Network error. The update may have succeeded. Please refresh.';
+      } else if (errorMessage.contains('timeout')) {
+        errorMessage = 'Request timeout. The update may have succeeded. Please refresh.';
+      }
+      
+      _setError('Failed to update staff: $errorMessage');
+      
+      // Don't rethrow - let the UI handle the error gracefully
     }
   }
 

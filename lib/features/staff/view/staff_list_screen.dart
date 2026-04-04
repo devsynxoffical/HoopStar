@@ -22,6 +22,11 @@ class _StaffListScreenState extends State<StaffListScreen> {
   Staff? _selectedStaff;
   bool _isDetailPasswordVisible = false;
 
+  String _safeProfilePic(String? url, String name) {
+    if (url != null && url.startsWith('http')) return url;
+    return 'https://picsum.photos/seed/$name/100/100';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -119,7 +124,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
         InkWell(
           onTap: () => setState(() => _selectedStaff = rootStaff),
           borderRadius: BorderRadius.circular(20),
-          child: _buildRootNode(rootStaff.name, rootStaff.role, rootStaff.profilePic ?? 'https://ui-avatars.com/api/?name=${rootStaff.name}&background=FFD700&color=000'),
+          child: _buildRootNode(rootStaff.name, _safeProfilePic(rootStaff.profilePic, rootStaff.name), rootStaff.role),
         ),
         if (otherStaff.isNotEmpty)
           Padding(
@@ -128,7 +133,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
               children: otherStaff.map((s) => InkWell(
                 onTap: () => setState(() => _selectedStaff = s),
                 borderRadius: BorderRadius.circular(12),
-                child: _buildChildNode(s.name, s.role, s.profilePic ?? 'https://ui-avatars.com/api/?name=${s.name}&background=2A2A2A&color=FFF'),
+                child: _buildChildNode(s.name, _safeProfilePic(s.profilePic, s.name), s.role),
               )).toList(),
             ),
           ),
@@ -142,7 +147,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
       decoration: BoxDecoration(color: surfaceHigh, borderRadius: BorderRadius.circular(20), border: Border.all(color: primaryColor.withOpacity(0.3))),
       child: Row(
         children: [
-          CircleAvatar(radius: 20, backgroundImage: NetworkImage(img), backgroundColor: surfaceContainer),
+          CircleAvatar(radius: 20, backgroundImage: NetworkImage(img), backgroundColor: surfaceContainer, child: img.contains('ui-avatars') ? Icon(Icons.person, color: Colors.white, size: 20) : null),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -170,7 +175,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
           decoration: BoxDecoration(color: surfaceContainer, borderRadius: BorderRadius.circular(12), border: Border.all(color: outlineColor.withOpacity(0.1))),
           child: Row(
             children: [
-              CircleAvatar(radius: 16, backgroundImage: NetworkImage(img), backgroundColor: bgColor),
+              CircleAvatar(radius: 16, backgroundImage: NetworkImage(img), backgroundColor: surfaceContainer, child: img.contains('ui-avatars') ? Icon(Icons.person, color: Colors.white, size: 16) : null),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -215,7 +220,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
         children: [
           Row(
             children: [
-              CircleAvatar(radius: 32, backgroundImage: NetworkImage(_selectedStaff!.profilePic ?? 'https://ui-avatars.com/api/?name=${_selectedStaff!.name}&background=random'), backgroundColor: surfaceContainer),
+              CircleAvatar(radius: 32, backgroundImage: NetworkImage(_safeProfilePic(_selectedStaff!.profilePic, _selectedStaff!.name)), backgroundColor: surfaceContainer, child: (_selectedStaff!.profilePic?.contains('ui-avatars') ?? false) ? Icon(Icons.person, color: Colors.white, size: 32) : null),
               const SizedBox(width: 20),
               Expanded(
                 child: Column(
@@ -343,6 +348,22 @@ class _StaffListScreenState extends State<StaffListScreen> {
              p.manageStaff = v;
              await provider.updateStaffInBackend(_selectedStaff!);
           }),
+          _permissionSwitch('Create Battles', 'Schedule new match events', p.createBattle, (v) async {
+             p.createBattle = v;
+             await provider.updateStaffInBackend(_selectedStaff!);
+          }),
+          _permissionSwitch('Manage Battles', 'Control match parameters', p.manageBattle, (v) async {
+             p.manageBattle = v;
+             await provider.updateStaffInBackend(_selectedStaff!);
+          }),
+          _permissionSwitch('Create Strategy', 'Develop playbooks', p.createStrategy, (v) async {
+             p.createStrategy = v;
+             await provider.updateStaffInBackend(_selectedStaff!);
+          }),
+          _permissionSwitch('Manage Strategy', 'Direct strategic operations', p.manageStrategy, (v) async {
+             p.manageStrategy = v;
+             await provider.updateStaffInBackend(_selectedStaff!);
+          }),
         ],
       ),
     );
@@ -350,6 +371,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
 
   Widget _permissionSwitch(String title, String sub, bool value, Future<void> Function(bool) onChanged) {
     bool _localValue = value;
+    bool _isUpdating = false;
     return StatefulBuilder(
       builder: (context, setLocalState) {
         return Padding(
@@ -368,12 +390,46 @@ class _StaffListScreenState extends State<StaffListScreen> {
               ),
               Switch(
                 value: _localValue,
-                onChanged: (v) async {
-                  setLocalState(() => _localValue = v);
+                onChanged: _isUpdating ? null : (v) async {
+                  setLocalState(() {
+                    _localValue = v;
+                    _isUpdating = true;
+                  });
+                  
                   try {
                     await onChanged(v);
+                    // Success - keep the new value
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('$title updated successfully'),
+                          backgroundColor: Colors.green,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
                   } catch (e) {
-                    setLocalState(() => _localValue = !v); // Rollback
+                    // Error - rollback the change
+                    setLocalState(() => _localValue = !v);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to update $title: ${e.toString().replaceAll('Exception: ', '')}'),
+                          backgroundColor: Colors.redAccent,
+                          duration: const Duration(seconds: 3),
+                          action: SnackBarAction(
+                            label: 'Retry',
+                            textColor: Colors.white,
+                            onPressed: () {
+                              // Retry the same action
+                              onChanged(_localValue);
+                            },
+                          ),
+                        ),
+                      );
+                    }
+                  } finally {
+                    setLocalState(() => _isUpdating = false);
                   }
                 },
                 activeColor: primaryColor,
@@ -401,7 +457,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
             children: staff.take(5).map((s) => InkWell(
               onTap: () => setState(() => _selectedStaff = s),
               borderRadius: BorderRadius.circular(40),
-              child: _profileCircle(s.name, s.profilePic ?? 'https://ui-avatars.com/api/?name=${s.name}&background=random', s.id == _selectedStaff?.id),
+              child: _profileCircle(s.name, s.profilePic ?? 'https://picsum.photos/seed/${s.name}/100/100', s.id == _selectedStaff?.id),
             )).toList(),
           ),
         ),
@@ -417,7 +473,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
           Container(
             padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: isActive ? primaryColor : Colors.transparent, width: 2.5)),
-            child: CircleAvatar(radius: 28, backgroundImage: NetworkImage(img), backgroundColor: surfaceContainer),
+            child: CircleAvatar(radius: 28, backgroundImage: NetworkImage(_safeProfilePic(img, name)), backgroundColor: surfaceContainer, child: img.contains('ui-avatars') ? Icon(Icons.person, color: Colors.white, size: 28) : null),
           ),
           const SizedBox(height: 8),
           Text(name.toUpperCase(), style: TextStyle(color: isActive ? primaryColor : Colors.white, fontSize: 10, fontWeight: isActive ? FontWeight.w900 : FontWeight.bold)),

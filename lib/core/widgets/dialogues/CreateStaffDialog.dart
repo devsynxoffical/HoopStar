@@ -78,6 +78,18 @@ class _CreateStaffDialogState extends State<CreateStaffDialog> {
       return;
     }
 
+    // Check if email already exists
+    try {
+      final existingStaff = await _staffService.getStaffCredentials();
+      final emailExists = existingStaff.any((staff) => staff['email'] == email);
+      if (emailExists) {
+        setState(() => _errorMessage = 'EMAIL ALREADY REGISTERED');
+        return;
+      }
+    } catch (e) {
+      // Continue if check fails
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;

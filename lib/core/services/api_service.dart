@@ -151,6 +151,10 @@ class ApiService {
       print('Socket connected: ${socket!.id}');
     });
 
+    socket!.onConnectError((error) {
+      print('Socket connection error: $error');
+    });
+
     socket!.onDisconnect((_) {
       print('Socket disconnected');
     });
